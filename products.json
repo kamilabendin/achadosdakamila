@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1",
+    "name": "Vestido Midi Canelado Premium",
+    "description": "Perfeito para qualquer ocasião, tecido super confortável que modela o corpo com elegância.",
+    "price": "R$ 69,90",
+    "imageUrl": "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&q=80",
+    "shopeeUrl": "https://shopee.com.br",
+    "tiktokUrl": "https://tiktok.com",
+    "createdAt": "2026-04-27T01:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "name": "Bolsa Baguette Vintage Bege",
+    "description": "Design clássico que nunca sai de moda. O acessório ideal para elevar seu look diário.",
+    "price": "R$ 124,00",
+    "imageUrl": "https://images.unsplash.com/photo-1584917033904-47e08ef7d9d3?w=800&q=80",
+    "shopeeUrl": "https://shopee.com.br",
+    "tiktokUrl": "https://tiktok.com",
+    "createdAt": "2026-04-27T01:05:00.000Z"
+  },
+  {
+    "id": "3",
+    "name": "Sandália Minimalista Soft",
+    "description": "Caminhe nas nuvens com essa sandália que une conforto extremo e sofisticação.",
+    "price": "R$ 89,90",
+    "imageUrl": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800&q=80",
+    "shopeeUrl": "https://shopee.com.br",
+    "tiktokUrl": "",
+    "createdAt": "2026-04-27T01:10:00.000Z"
+  }
+]
