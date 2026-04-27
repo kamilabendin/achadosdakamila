@@ -8,12 +8,27 @@ export default function Showcase() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/products")
-      .then((res) => res.json())
-      .then((data) => {
-        setProducts(data);
-        setLoading(false);
-      });
+    const savedProducts = localStorage.getItem("vitrine_products");
+    if (savedProducts) {
+      setProducts(JSON.parse(savedProducts));
+      setLoading(false);
+    } else {
+      // Default sample products if none exist
+      const defaults: Product[] = [
+        {
+          id: "1",
+          name: "Vestido Minimalista Seda",
+          description: "Peça essencial para o guarda-roupa, tecido leve e sofisticado.",
+          price: "R$ 189,90",
+          imageUrl: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&q=80",
+          shopeeUrl: "https://shopee.com.br",
+          isFeatured: true,
+          primaryLink: "shopee"
+        }
+      ];
+      setProducts(defaults);
+      setLoading(false);
+    }
   }, []);
 
   if (loading) {

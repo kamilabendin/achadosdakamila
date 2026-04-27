@@ -26,39 +26,29 @@ export default function Admin() {
     const savedPass = localStorage.getItem("admin_pass");
     if (savedPass) {
       setPassword(savedPass);
-      checkAuth(savedPass);
+      // Simulating auth for Netlify (using "admin" as default)
+      if (savedPass === "admin") {
+        setIsAuthenticated(true);
+        const savedProducts = localStorage.getItem("vitrine_products");
+        if (savedProducts) {
+          setProducts(JSON.parse(savedProducts));
+        }
+      }
     }
   }, []);
 
   const checkAuth = async (pass: string) => {
     if (!pass) return;
-    try {
-      const res = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pass }),
-      });
-
-      if (res.ok) {
-        setIsAuthenticated(true);
-        localStorage.setItem("admin_pass", pass);
-        // Load products after auth
-        const prodRes = await fetch("/api/products");
-        if (prodRes.ok) {
-          const data = await prodRes.json();
-          setProducts(data);
-        }
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setIsAuthenticated(false);
-        if (localStorage.getItem("admin_pass")) {
-          localStorage.removeItem("admin_pass");
-        }
-        setLoginError(errData.error || "Senha incorreta, tente novamente.");
+    // Simple clinet-side check for demonstration/Netlify
+    if (pass === "admin") {
+      setIsAuthenticated(true);
+      localStorage.setItem("admin_pass", pass);
+      const savedProducts = localStorage.getItem("vitrine_products");
+      if (savedProducts) {
+        setProducts(JSON.parse(savedProducts));
       }
-    } catch (e) {
-      console.error("Auth fetch error:", e);
-      setLoginError("Erro ao conectar com o servidor.");
+    } else {
+      setLoginError("Senha incorreta. Use 'admin'");
     }
   };
 
@@ -78,52 +68,29 @@ export default function Admin() {
     e.preventDefault();
     setError("");
 
-    try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, product: newProduct }),
-      });
-
-      if (res.ok) {
-        const added = await res.json();
-        setProducts([...products, added]);
-        setShowAddForm(false);
-        setNewProduct({
-          name: "",
-          description: "",
-          price: "",
-          imageUrl: "",
-          shopeeUrl: "",
-          tiktokUrl: "",
-          isFeatured: false,
-          primaryLink: "shopee",
-        });
-      } else {
-        const err = await res.json();
-        setError(err.error || "Algo deu errado");
-      }
-    } catch (err) {
-      setError("Erro de rede");
-    }
+    const productWithId = { ...newProduct, id: Date.now().toString() };
+    const updatedProducts = [...products, productWithId];
+    setProducts(updatedProducts);
+    localStorage.setItem("vitrine_products", JSON.stringify(updatedProducts));
+    
+    setShowAddForm(false);
+    setNewProduct({
+      name: "",
+      description: "",
+      price: "",
+      imageUrl: "",
+      shopeeUrl: "",
+      tiktokUrl: "",
+      isFeatured: false,
+      primaryLink: "shopee",
+    });
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir?")) return;
-
-    try {
-      const res = await fetch(`/api/products/${id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-
-      if (res.ok) {
-        setProducts(products.filter((p) => p.id !== id));
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    const updatedProducts = products.filter((p) => p.id !== id);
+    setProducts(updatedProducts);
+    localStorage.setItem("vitrine_products", JSON.stringify(updatedProducts));
   };
 
   if (!isAuthenticated) {
