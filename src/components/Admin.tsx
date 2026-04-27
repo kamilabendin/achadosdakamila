@@ -215,7 +215,8 @@ export default function Admin() {
           <div className="bg-brand-beige w-20 h-20 rounded-3xl flex items-center justify-center text-brand-brown mb-8 mx-auto">
             <Key size={40} />
           </div>
-          <h1 className="text-2xl font-serif font-bold text-center mb-8 text-brand-brown-dark">Painel Privado</h1>
+          <h1 className="text-2xl font-serif font-bold text-center mb-1 text-brand-brown-dark">Painel Privado</h1>
+          <p className="text-[10px] text-center text-brand-brown/40 uppercase tracking-widest font-bold mb-8">Dica: use a senha "admin"</p>
           <form onSubmit={handleLogin} className="space-y-6">
             {loginError && (
               <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold text-center border border-red-100">
