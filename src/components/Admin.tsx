@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Key, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Video, Save, X, FileSpreadsheet, LogOut, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Key, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Video, Save, X, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Product } from "../types";
-
-declare const google: any;
 
 export default function Admin() {
   const [password, setPassword] = useState("");
@@ -12,8 +10,6 @@ export default function Admin() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [error, setError] = useState("");
-  const [syncStatus, setSyncStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -36,7 +32,6 @@ export default function Admin() {
 
   const checkAuth = async (pass: string) => {
     if (!pass) return;
-    console.log("Checking auth for password...");
     try {
       const res = await fetch("/api/auth/verify", {
         method: "POST",
@@ -44,12 +39,9 @@ export default function Admin() {
         body: JSON.stringify({ password: pass }),
       });
 
-      console.log("Auth response status:", res.status);
-
       if (res.ok) {
         setIsAuthenticated(true);
         localStorage.setItem("admin_pass", pass);
-        console.log("Authentication successful, loading products...");
         // Load products after auth
         const prodRes = await fetch("/api/products");
         if (prodRes.ok) {
@@ -58,7 +50,6 @@ export default function Admin() {
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        console.log("Authentication failed:", errData.error);
         setIsAuthenticated(false);
         if (localStorage.getItem("admin_pass")) {
           localStorage.removeItem("admin_pass");
@@ -75,75 +66,6 @@ export default function Admin() {
     setIsAuthenticated(false);
     localStorage.removeItem("admin_pass");
     setPassword("");
-    setAccessToken(null);
-  };
-
-  const handleGoogleAuth = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId || clientId === "" || clientId === "your_google_client_id_here") {
-      setError("Configuração pendente: Por favor, adicione seu 'VITE_GOOGLE_CLIENT_ID' no painel de Segredos (Secrets) para habilitar a exportação para o Google Sheets.");
-      return;
-    }
-    try {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "SEU_CLIENT_ID_DO_GOOGLE",
-        scope: "https://www.googleapis.com/auth/spreadsheets",
-        callback: (response: any) => {
-          if (response.access_token) {
-            setAccessToken(response.access_token);
-            syncToSheets(response.access_token);
-          }
-        },
-      });
-      client.requestAccessToken();
-    } catch (e) {
-      console.error(e);
-      setError("Erro ao inicializar Google Auth. Verifique se as janelas popup estão permitidas.");
-    }
-  };
-
-  const syncToSheets = async (token: string) => {
-    setSyncStatus("loading");
-    try {
-      // Create a new sheet or use existing? 
-      // For simplicity, we'll create a new one each time or ask for ID.
-      const response = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          properties: { title: `Vitrine de Produtos - ${new Date().toLocaleDateString()}` },
-          sheets: [{
-            data: [{
-              startRow: 0,
-              startColumn: 0,
-              rowData: [
-                { values: [{ userEnteredValue: { stringValue: "ID" } }, { userEnteredValue: { stringValue: "Nome" } }, { userEnteredValue: { stringValue: "Preço" } }, { userEnteredValue: { stringValue: "Link Shopee" } }] },
-                ...products.map(p => ({
-                  values: [
-                    { userEnteredValue: { stringValue: p.id } },
-                    { userEnteredValue: { stringValue: p.name } },
-                    { userEnteredValue: { stringValue: p.price } },
-                    { userEnteredValue: { stringValue: p.shopeeUrl } }
-                  ]
-                }))
-              ]
-            }]
-          }]
-        }),
-      });
-
-      if (response.ok) {
-        setSyncStatus("success");
-        setTimeout(() => setSyncStatus("idle"), 3000);
-      } else {
-        setSyncStatus("error");
-      }
-    } catch (e) {
-      setSyncStatus("error");
-    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -258,28 +180,13 @@ export default function Admin() {
               Sair do Painel
             </button>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleGoogleAuth}
-              className="bg-brand-cream border-2 border-brand-brown-light/20 hover:border-brand-brown-light text-brand-brown px-6 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95"
-            >
-              {syncStatus === "loading" ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-brand-brown border-t-transparent" />
-              ) : syncStatus === "success" ? (
-                <CheckCircle2 size={20} className="text-green-500" />
-              ) : (
-                <FileSpreadsheet size={20} />
-              )}
-              {syncStatus === "success" ? "Enviado!" : "Exportar Planilha"}
-            </button>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-8 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95"
-            >
-              <Plus size={20} />
-              Novo Produto
-            </button>
-          </div>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-8 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95"
+          >
+            <Plus size={20} />
+            Novo Produto
+          </button>
         </header>
 
         <div className="grid gap-6">
