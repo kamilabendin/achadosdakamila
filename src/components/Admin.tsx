@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Key, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Video, Save, X, LogOut } from "lucide-react";
+import { Plus, Trash2, Key, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Video, Save, X, LogOut, Copy, Check, Database } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Product } from "../types";
+import defaultProducts from "../../products.json";
 
 export default function Admin() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [error, setError] = useState("");
 
@@ -32,6 +35,8 @@ export default function Admin() {
         const savedProducts = localStorage.getItem("vitrine_products");
         if (savedProducts) {
           setProducts(JSON.parse(savedProducts));
+        } else {
+          setProducts(defaultProducts as Product[]);
         }
       }
     }
@@ -46,6 +51,8 @@ export default function Admin() {
       const savedProducts = localStorage.getItem("vitrine_products");
       if (savedProducts) {
         setProducts(JSON.parse(savedProducts));
+      } else {
+        setProducts(defaultProducts as Product[]);
       }
     } else {
       setLoginError("Senha incorreta. Use 'admin'");
@@ -147,13 +154,22 @@ export default function Admin() {
               Sair do Painel
             </button>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-8 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95"
-          >
-            <Plus size={20} />
-            Novo Produto
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="bg-brand-cream border-2 border-brand-brown-light/20 hover:border-brand-brown-light text-brand-brown px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
+            >
+              <Database size={20} />
+              Sincronizar com o Site
+            </button>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
+            >
+              <Plus size={20} />
+              Novo Produto
+            </button>
+          </div>
         </header>
 
         <div className="grid gap-6">
@@ -325,6 +341,76 @@ export default function Admin() {
                     Salvar na Vitrine
                   </button>
                 </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Export Database Modal */}
+        <AnimatePresence>
+          {showExportModal && (
+            <div className="fixed inset-0 bg-brand-brown-dark/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-brand-cream w-full max-w-xl rounded-[2.5rem] overflow-hidden shadow-2xl border border-brand-brown-light/20"
+              >
+                <div className="p-8 border-b border-brand-brown-light/10 flex justify-between items-center bg-brand-beige/30">
+                  <h2 className="text-2xl font-serif font-bold text-brand-brown-dark flex items-center gap-2">
+                    <Database size={24} />
+                    Sincronizar com o Site
+                  </h2>
+                  <button onClick={() => { setShowExportModal(false); setCopied(false); }} className="text-brand-brown/40 hover:text-brand-brown-dark p-2 rounded-full hover:bg-brand-beige transition-all">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="p-8 space-y-6">
+                  <div className="space-y-3">
+                    <p className="text-sm text-brand-brown/80 leading-relaxed">
+                      Como seu site é hospedado de forma estática e gratuita no Netlify, as alterações que você faz aqui no painel ficam salvas temporariamente no seu navegador.
+                    </p>
+                    <p className="text-sm font-bold text-brand-brown-dark bg-amber-50/70 border border-amber-100 p-4 rounded-2xl leading-relaxed">
+                      💡 Para que suas atualizações (novos produtos ou exclusões) fiquem salvas para todos os visitantes do site permanentemente:
+                    </p>
+                    <ol className="list-decimal list-inside text-xs text-brand-brown/70 space-y-1.5 ml-1">
+                      <li>Clique no botão abaixo para copiar o código atualizado.</li>
+                      <li>Envie o código copiado aqui no nosso chat do assistente.</li>
+                      <li>Eu atualizarei o banco de dados permanentemente para você em segundos!</li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-brand-brown/40 uppercase tracking-[0.2em]">Código de Atualização</span>
+                      {copied && (
+                        <span className="text-xs font-bold text-green-600 flex items-center gap-1">
+                          <Check size={14} /> Copiado!
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <textarea
+                        readOnly
+                        value={JSON.stringify(products, null, 2)}
+                        className="w-full h-40 p-4 font-mono text-xs rounded-2xl border border-brand-brown-light/20 bg-brand-beige/20 text-brand-brown-dark focus:outline-none resize-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(JSON.stringify(products, null, 2));
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 3000);
+                        }}
+                        className="absolute right-3 bottom-3 bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                      >
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                        {copied ? "Copiado!" : "Copiar Código"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             </div>
           )}

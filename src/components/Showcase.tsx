@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ShoppingBag, Video, ExternalLink, Package } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Product } from "../types";
+import defaultProducts from "../../products.json";
 
 export default function Showcase() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -13,20 +14,7 @@ export default function Showcase() {
       setProducts(JSON.parse(savedProducts));
       setLoading(false);
     } else {
-      // Default sample products if none exist
-      const defaults: Product[] = [
-        {
-          id: "1",
-          name: "Vestido Minimalista Seda",
-          description: "Peça essencial para o guarda-roupa, tecido leve e sofisticado.",
-          price: "R$ 189,90",
-          imageUrl: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&q=80",
-          shopeeUrl: "https://shopee.com.br",
-          isFeatured: true,
-          primaryLink: "shopee"
-        }
-      ];
-      setProducts(defaults);
+      setProducts(defaultProducts as Product[]);
       setLoading(false);
     }
   }, []);
