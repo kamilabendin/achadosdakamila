@@ -1,32 +1,38 @@
 [
   {
     "id": "1",
-    "name": "Vestido Midi Canelado Premium",
-    "description": "Perfeito para qualquer ocasião, tecido super confortável que modela o corpo com elegância.",
-    "price": "R$ 69,90",
+    "name": "Vestido Minimalista Seda",
+    "description": "Peça essencial para o guarda-roupa, tecido leve e sofisticado ideal para ocasiões especiais ou um visual casual premium.",
+    "price": "R$ 189,90",
     "imageUrl": "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800&q=80",
     "shopeeUrl": "https://shopee.com.br",
-    "tiktokUrl": "https://tiktok.com",
-    "createdAt": "2026-04-27T01:00:00.000Z"
+    "tiktokUrl": "https://www.tiktok.com",
+    "isFeatured": true,
+    "primaryLink": "shopee",
+    "createdAt": "2026-07-20T14:40:00.000Z"
   },
   {
     "id": "2",
-    "name": "Bolsa Baguette Vintage Bege",
-    "description": "Design clássico que nunca sai de moda. O acessório ideal para elevar seu look diário.",
-    "price": "R$ 124,00",
-    "imageUrl": "https://images.unsplash.com/photo-1584917033904-47e08ef7d9d3?w=800&q=80",
+    "name": "Bolsa Tiracolo Couro Vintage",
+    "description": "Estilo clássico e atemporal com acabamento em couro trabalhado à mão. Espaço ideal para levar seus itens do dia a dia com máxima elegância.",
+    "price": "R$ 249,00",
+    "imageUrl": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80",
     "shopeeUrl": "https://shopee.com.br",
-    "tiktokUrl": "https://tiktok.com",
-    "createdAt": "2026-04-27T01:05:00.000Z"
+    "tiktokUrl": "https://www.tiktok.com",
+    "isFeatured": true,
+    "primaryLink": "shopee",
+    "createdAt": "2026-07-20T14:41:00.000Z"
   },
   {
     "id": "3",
-    "name": "Sandália Minimalista Soft",
-    "description": "Caminhe nas nuvens com essa sandália que une conforto extremo e sofisticação.",
+    "name": "Óculos de Sol Retro Oval",
+    "description": "Proteção UV400 completa com design vintage icônico. Armação ultraleve em acetato para conforto prolongado.",
     "price": "R$ 89,90",
-    "imageUrl": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800&q=80",
+    "imageUrl": "https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=800&q=80",
     "shopeeUrl": "https://shopee.com.br",
-    "tiktokUrl": "",
-    "createdAt": "2026-04-27T01:10:00.000Z"
+    "tiktokUrl": "https://www.tiktok.com",
+    "isFeatured": false,
+    "primaryLink": "shopee",
+    "createdAt": "2026-07-20T14:42:00.000Z"
   }
 ]

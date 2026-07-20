@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Key, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Video, Save, X, LogOut, Copy, Check, Database } from "lucide-react";
+import { Plus, Trash2, Key, Image as ImageIcon, Link as LinkIcon, ShoppingBag, Video, Save, X, LogOut, Copy, Check, Database, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Link } from "react-router-dom";
 import { Product } from "../types";
 import defaultProducts from "../../products.json";
 
@@ -8,6 +9,8 @@ export default function Admin() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [dbMode, setDbMode] = useState<"supabase" | "local" | "loading">("loading");
+  const [supabaseUrl, setSupabaseUrl] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -26,36 +29,52 @@ export default function Admin() {
   });
 
   useEffect(() => {
+    // Check DB integration mode
+    fetch("/api/status")
+      .then((res) => res.json())
+      .then((status) => {
+        setDbMode(status.mode);
+        setSupabaseUrl(status.supabaseUrl);
+      })
+      .catch((err) => {
+        console.warn("Could not query DB status:", err);
+        setDbMode("local");
+      });
+
     const savedPass = localStorage.getItem("admin_pass");
     if (savedPass) {
       setPassword(savedPass);
-      // Simulating auth for Netlify (using "admin" as default)
-      if (savedPass === "admin") {
-        setIsAuthenticated(true);
-        const savedProducts = localStorage.getItem("vitrine_products");
-        if (savedProducts) {
-          setProducts(JSON.parse(savedProducts));
-        } else {
-          setProducts(defaultProducts as Product[]);
-        }
-      }
+      checkAuth(savedPass);
     }
   }, []);
 
   const checkAuth = async (pass: string) => {
     if (!pass) return;
-    // Simple clinet-side check for demonstration/Netlify
-    if (pass === "admin") {
-      setIsAuthenticated(true);
-      localStorage.setItem("admin_pass", pass);
-      const savedProducts = localStorage.getItem("vitrine_products");
-      if (savedProducts) {
-        setProducts(JSON.parse(savedProducts));
+    try {
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pass }),
+      });
+
+      if (res.ok) {
+        setIsAuthenticated(true);
+        localStorage.setItem("admin_pass", pass);
+        // Load products
+        const prodRes = await fetch("/api/products");
+        if (prodRes.ok) {
+          const data = await prodRes.json();
+          setProducts(data);
+        }
       } else {
-        setProducts(defaultProducts as Product[]);
+        setIsAuthenticated(false);
+        if (localStorage.getItem("admin_pass")) {
+          localStorage.removeItem("admin_pass");
+        }
+        setLoginError("Senha incorreta, tente novamente.");
       }
-    } else {
-      setLoginError("Senha incorreta. Use 'admin'");
+    } catch (e) {
+      setLoginError("Erro ao conectar com o servidor.");
     }
   };
 
@@ -75,29 +94,60 @@ export default function Admin() {
     e.preventDefault();
     setError("");
 
-    const productWithId = { ...newProduct, id: Date.now().toString() };
-    const updatedProducts = [...products, productWithId];
-    setProducts(updatedProducts);
-    localStorage.setItem("vitrine_products", JSON.stringify(updatedProducts));
-    
-    setShowAddForm(false);
-    setNewProduct({
-      name: "",
-      description: "",
-      price: "",
-      imageUrl: "",
-      shopeeUrl: "",
-      tiktokUrl: "",
-      isFeatured: false,
-      primaryLink: "shopee",
-    });
+    const productWithId = {
+      ...newProduct,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, product: productWithId }),
+      });
+
+      if (res.ok) {
+        const added = await res.json();
+        setProducts([added, ...products]);
+        setShowAddForm(false);
+        setNewProduct({
+          name: "",
+          description: "",
+          price: "",
+          imageUrl: "",
+          shopeeUrl: "",
+          tiktokUrl: "",
+          isFeatured: false,
+          primaryLink: "shopee",
+        });
+      } else {
+        const errData = await res.json();
+        setError(errData.error || "Algo deu errado");
+      }
+    } catch (err) {
+      setError("Erro ao salvar produto no servidor");
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir?")) return;
-    const updatedProducts = products.filter((p) => p.id !== id);
-    setProducts(updatedProducts);
-    localStorage.setItem("vitrine_products", JSON.stringify(updatedProducts));
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+
+      if (res.ok) {
+        setProducts(products.filter((p) => p.id !== id));
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Erro ao deletar produto");
+      }
+    } catch (err) {
+      alert("Erro ao conectar com o servidor para deletar produto");
+    }
   };
 
   if (!isAuthenticated) {
@@ -146,22 +196,43 @@ export default function Admin() {
           <div className="text-center sm:text-left">
             <h1 className="text-3xl font-serif font-bold text-brand-brown-dark">Gestão da Vitrine</h1>
             <p className="text-sm text-brand-brown/60">Organize seus links de produtos favoritos</p>
+            
+            {/* Status Indicator */}
+            <div className="mt-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+              {dbMode === "supabase" ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100 shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  Nuvem Supabase Ativa (Mudanças em Tempo Real)
+                </span>
+              ) : dbMode === "loading" ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-500 border border-gray-100 shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></span>
+                  Verificando conexão...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Modo Local (Configure o Supabase nos Secrets para salvar na nuvem)
+                </span>
+              )}
+            </div>
+
             <button 
               onClick={handleLogout}
-              className="text-[10px] text-brand-brown/40 hover:text-brand-brown underline uppercase tracking-widest font-bold mt-2 flex items-center gap-1"
+              className="text-[10px] text-brand-brown/40 hover:text-brand-brown underline uppercase tracking-widest font-bold mt-3 flex items-center gap-1 mx-auto sm:mx-0"
             >
               <LogOut size={10} />
               Sair do Painel
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button
-              onClick={() => setShowExportModal(true)}
+            <Link
+              to="/"
               className="bg-brand-cream border-2 border-brand-brown-light/20 hover:border-brand-brown-light text-brand-brown px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
             >
-              <Database size={20} />
-              Sincronizar com o Site
-            </button>
+              <ArrowLeft size={20} />
+              Voltar para página inicial
+            </Link>
             <button
               onClick={() => setShowAddForm(true)}
               className="bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
@@ -359,57 +430,122 @@ export default function Admin() {
                 <div className="p-8 border-b border-brand-brown-light/10 flex justify-between items-center bg-brand-beige/30">
                   <h2 className="text-2xl font-serif font-bold text-brand-brown-dark flex items-center gap-2">
                     <Database size={24} />
-                    Sincronizar com o Site
+                    {dbMode === "supabase" ? "Conexão Supabase Ativa" : "Sincronizar com o Site"}
                   </h2>
                   <button onClick={() => { setShowExportModal(false); setCopied(false); }} className="text-brand-brown/40 hover:text-brand-brown-dark p-2 rounded-full hover:bg-brand-beige transition-all">
                     <X size={24} />
                   </button>
                 </div>
 
-                <div className="p-8 space-y-6">
-                  <div className="space-y-3">
-                    <p className="text-sm text-brand-brown/80 leading-relaxed">
-                      Como seu site é hospedado de forma estática e gratuita no Netlify, as alterações que você faz aqui no painel ficam salvas temporariamente no seu navegador.
-                    </p>
-                    <p className="text-sm font-bold text-brand-brown-dark bg-amber-50/70 border border-amber-100 p-4 rounded-2xl leading-relaxed">
-                      💡 Para que suas atualizações (novos produtos ou exclusões) fiquem salvas para todos os visitantes do site permanentemente:
-                    </p>
-                    <ol className="list-decimal list-inside text-xs text-brand-brown/70 space-y-1.5 ml-1">
-                      <li>Clique no botão abaixo para copiar o código atualizado.</li>
-                      <li>Envie o código copiado aqui no nosso chat do assistente.</li>
-                      <li>Eu atualizarei o banco de dados permanentemente para você em segundos!</li>
-                    </ol>
-                  </div>
+                <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                  {dbMode === "supabase" ? (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-2xl text-sm space-y-2">
+                        <p className="font-bold">🟢 Banco de Dados Conectado!</p>
+                        <p className="text-xs text-green-700 leading-relaxed">
+                          Tudo pronto! Todas as atualizações, novos produtos e exclusões que você fizer aqui no painel serão gravadas permanentemente no seu banco de dados Supabase e estarão visíveis instantaneamente para todos os visitantes do site.
+                        </p>
+                      </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-brand-brown/40 uppercase tracking-[0.2em]">Código de Atualização</span>
-                      {copied && (
-                        <span className="text-xs font-bold text-green-600 flex items-center gap-1">
-                          <Check size={14} /> Copiado!
-                        </span>
-                      )}
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-brand-brown/40 uppercase tracking-[0.2em]">Estrutura SQL da Tabela (Supabase)</label>
+                        <p className="text-xs text-brand-brown/70 leading-relaxed">
+                          Se você acabou de configurar o Supabase, vá para o painel do Supabase, clique em <strong>SQL Editor</strong>, clique em <strong>New Query</strong>, cole o código abaixo e clique em <strong>Run</strong>:
+                        </p>
+                        <div className="relative">
+                          <pre className="bg-brand-beige/30 border border-brand-brown-light/10 p-4 rounded-2xl text-xs font-mono text-brand-brown overflow-x-auto">
+{`create table products (
+  id text primary key,
+  name text not null,
+  description text,
+  price text,
+  "imageUrl" text,
+  "shopeeUrl" text,
+  "tiktokUrl" text,
+  "isFeatured" boolean default false,
+  "primaryLink" text default 'shopee',
+  "createdAt" timestamp with time zone default timezone('utc'::text, now()) not null
+);`}
+                          </pre>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`create table products (
+  id text primary key,
+  name text not null,
+  description text,
+  price text,
+  "imageUrl" text,
+  "shopeeUrl" text,
+  "tiktokUrl" text,
+  "isFeatured" boolean default false,
+  "primaryLink" text default 'shopee',
+  "createdAt" timestamp with time zone default timezone('utc'::text, now()) not null
+);`);
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 3000);
+                            }}
+                            className="absolute right-3 bottom-3 bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow active:scale-95"
+                          >
+                            {copied ? "Copiado!" : "Copiar SQL"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="relative">
-                      <textarea
-                        readOnly
-                        value={JSON.stringify(products, null, 2)}
-                        className="w-full h-40 p-4 font-mono text-xs rounded-2xl border border-brand-brown-light/20 bg-brand-beige/20 text-brand-brown-dark focus:outline-none resize-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(products, null, 2));
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 3000);
-                        }}
-                        className="absolute right-3 bottom-3 bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
-                      >
-                        {copied ? <Check size={14} /> : <Copy size={14} />}
-                        {copied ? "Copiado!" : "Copiar Código"}
-                      </button>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-sm text-brand-brown/80 leading-relaxed">
+                        Como você solicitou a integração com o Supabase, nós preparamos tudo! Agora falta apenas você inserir as credenciais do seu projeto Supabase para ativar a gravação na nuvem automática.
+                      </p>
+
+                      <div className="bg-amber-50/70 border border-amber-200 p-4 rounded-2xl space-y-2 text-xs">
+                        <p className="font-bold text-amber-800">🛠️ Como configurar o Supabase:</p>
+                        <ol className="list-decimal list-inside text-amber-700 space-y-1.5 ml-1">
+                          <li>Crie um projeto no <a href="https://supabase.com" target="_blank" rel="noreferrer" className="underline font-bold">Supabase</a></li>
+                          <li>Vá nas configurações do projeto (Project Settings) &gt; API</li>
+                          <li>Abra o menu <strong>Settings</strong> (Segredos/Secrets) aqui no canto esquerdo da tela do assistente de código</li>
+                          <li>Adicione as chaves:
+                            <div className="mt-1 font-mono text-[11px] bg-white/50 p-2 rounded border border-amber-100">
+                              <div><strong>SUPABASE_URL</strong> = (sua Project URL)</div>
+                              <div><strong>SUPABASE_ANON_KEY</strong> = (sua public anon key)</div>
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-brand-brown/40 uppercase tracking-[0.2em]">Sincronização Manual (Código de Atualização)</span>
+                          {copied && (
+                            <span className="text-xs font-bold text-green-600 flex items-center gap-1">
+                              <Check size={14} /> Copiado!
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-brand-brown/70 leading-relaxed">
+                          Enquanto você não configura as chaves acima, você ainda pode copiar este código JSON atualizado de seus produtos e enviá-lo para mim no chat para que eu salve permanentemente:
+                        </p>
+                        <div className="relative">
+                          <textarea
+                            readOnly
+                            value={JSON.stringify(products, null, 2)}
+                            className="w-full h-32 p-4 font-mono text-xs rounded-2xl border border-brand-brown-light/20 bg-brand-beige/20 text-brand-brown-dark focus:outline-none resize-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(JSON.stringify(products, null, 2));
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 3000);
+                            }}
+                            className="absolute right-3 bottom-3 bg-brand-brown hover:bg-brand-brown-dark text-brand-cream px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                          >
+                            {copied ? <Check size={14} /> : <Copy size={14} />}
+                            {copied ? "Copiado!" : "Copiar Código JSON"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </motion.div>
             </div>

@@ -9,14 +9,25 @@ export default function Showcase() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedProducts = localStorage.getItem("vitrine_products");
-    if (savedProducts) {
-      setProducts(JSON.parse(savedProducts));
-      setLoading(false);
-    } else {
-      setProducts(defaultProducts as Product[]);
-      setLoading(false);
-    }
+    fetch("/api/products")
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
+      .then((data) => {
+        setProducts(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.warn("Using local fallback:", err);
+        const savedProducts = localStorage.getItem("vitrine_products");
+        if (savedProducts) {
+          setProducts(JSON.parse(savedProducts));
+        } else {
+          setProducts(defaultProducts as Product[]);
+        }
+        setLoading(false);
+      });
   }, []);
 
   if (loading) {
