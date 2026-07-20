@@ -9,25 +9,55 @@ export default function Showcase() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/products")
-      .then((res) => {
-        if (!res.ok) throw new Error("API error");
-        return res.json();
-      })
-      .then((data) => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.warn("Using local fallback:", err);
-        const savedProducts = localStorage.getItem("vitrine_products");
-        if (savedProducts) {
-          setProducts(JSON.parse(savedProducts));
-        } else {
-          setProducts(defaultProducts as Product[]);
+    const loadStorefrontProducts = async () => {
+      // 1. Try to fetch from Express server API first (if hosted on fullstack platforms)
+      try {
+        const res = await fetch("/api/products");
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data);
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-      });
+      } catch (err) {
+        console.warn("Express backend API unreachable, checking client-side fallbacks:", err);
+      }
+
+      // 2. Fallback: If client-side Supabase credentials exist in the client build, fetch from Supabase
+      const meta = import.meta as any;
+      const hasSupabase = !!(meta.env?.VITE_SUPABASE_URL && meta.env?.VITE_SUPABASE_ANON_KEY);
+      if (hasSupabase) {
+        try {
+          const { supabase } = await import("../lib/supabase");
+          if (supabase) {
+            const { data, error } = await supabase
+              .from("products")
+              .select("*")
+              .order("createdAt", { ascending: false });
+            if (!error && data) {
+              setProducts(data);
+              // Cache in localStorage
+              localStorage.setItem("vitrine_products", JSON.stringify(data));
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching from client-side Supabase:", err);
+        }
+      }
+
+      // 3. Fallback: LocalStorage cache or default static products
+      const savedProducts = localStorage.getItem("vitrine_products");
+      if (savedProducts) {
+        setProducts(JSON.parse(savedProducts));
+      } else {
+        setProducts(defaultProducts as Product[]);
+      }
+      setLoading(false);
+    };
+
+    loadStorefrontProducts();
   }, []);
 
   if (loading) {

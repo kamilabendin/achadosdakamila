@@ -16,6 +16,7 @@ export default function Admin() {
   const [copied, setCopied] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [error, setError] = useState("");
+  const [isStaticMode, setIsStaticMode] = useState(false);
 
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -31,14 +32,20 @@ export default function Admin() {
   useEffect(() => {
     // Check DB integration mode
     fetch("/api/status")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Not OK");
+        return res.json();
+      })
       .then((status) => {
         setDbMode(status.mode);
         setSupabaseUrl(status.supabaseUrl);
       })
       .catch((err) => {
-        console.warn("Could not query DB status:", err);
-        setDbMode("local");
+        console.warn("Could not query DB status from server, using client side values:", err);
+        const meta = import.meta as any;
+        const hasSupabase = !!(meta.env?.VITE_SUPABASE_URL && meta.env?.VITE_SUPABASE_ANON_KEY);
+        setDbMode(hasSupabase ? "supabase" : "local");
+        setSupabaseUrl(meta.env?.VITE_SUPABASE_URL || null);
       });
 
     const savedPass = localStorage.getItem("admin_pass");
@@ -47,6 +54,53 @@ export default function Admin() {
       checkAuth(savedPass);
     }
   }, []);
+
+  const handleStaticLoginFallback = async (pass: string) => {
+    const meta = import.meta as any;
+    const clientAdminPassword = meta.env?.VITE_ADMIN_PASSWORD || "admin";
+    
+    if (pass === clientAdminPassword) {
+      setIsAuthenticated(true);
+      setIsStaticMode(true);
+      setDbMode(meta.env?.VITE_SUPABASE_URL && meta.env?.VITE_SUPABASE_ANON_KEY ? "supabase" : "local");
+      localStorage.setItem("admin_pass", pass);
+      
+      // Attempt load from Supabase client-side if configured
+      const hasSupabase = !!(meta.env?.VITE_SUPABASE_URL && meta.env?.VITE_SUPABASE_ANON_KEY);
+      if (hasSupabase) {
+        try {
+          const { supabase } = await import("../lib/supabase");
+          if (supabase) {
+            const { data, error } = await supabase
+              .from("products")
+              .select("*")
+              .order("createdAt", { ascending: false });
+            if (!error && data) {
+              setProducts(data);
+              localStorage.setItem("vitrine_products", JSON.stringify(data));
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Error loading products from Supabase client-side:", err);
+        }
+      }
+      
+      // LocalStorage fallback
+      const savedProducts = localStorage.getItem("vitrine_products");
+      if (savedProducts) {
+        setProducts(JSON.parse(savedProducts));
+      } else {
+        setProducts(defaultProducts as Product[]);
+      }
+    } else {
+      setIsAuthenticated(false);
+      if (localStorage.getItem("admin_pass")) {
+        localStorage.removeItem("admin_pass");
+      }
+      setLoginError("Senha incorreta, tente novamente.");
+    }
+  };
 
   const checkAuth = async (pass: string) => {
     if (!pass) return;
@@ -59,6 +113,7 @@ export default function Admin() {
 
       if (res.ok) {
         setIsAuthenticated(true);
+        setIsStaticMode(false);
         localStorage.setItem("admin_pass", pass);
         // Load products
         const prodRes = await fetch("/api/products");
@@ -66,6 +121,8 @@ export default function Admin() {
           const data = await prodRes.json();
           setProducts(data);
         }
+      } else if (res.status === 404) {
+        await handleStaticLoginFallback(pass);
       } else {
         setIsAuthenticated(false);
         if (localStorage.getItem("admin_pass")) {
@@ -74,7 +131,7 @@ export default function Admin() {
         setLoginError("Senha incorreta, tente novamente.");
       }
     } catch (e) {
-      setLoginError("Erro ao conectar com o servidor.");
+      await handleStaticLoginFallback(pass);
     }
   };
 
@@ -99,6 +156,47 @@ export default function Admin() {
       id: Date.now().toString(),
       createdAt: new Date().toISOString()
     };
+
+    if (isStaticMode) {
+      try {
+        const meta = import.meta as any;
+        const hasSupabase = !!(meta.env?.VITE_SUPABASE_URL && meta.env?.VITE_SUPABASE_ANON_KEY);
+        let finalProduct = productWithId;
+        
+        if (hasSupabase) {
+          const { supabase } = await import("../lib/supabase");
+          if (supabase) {
+            const { data, error: sbError } = await supabase
+              .from("products")
+              .insert([productWithId])
+              .select();
+            if (sbError) throw sbError;
+            if (data && data[0]) {
+              finalProduct = data[0];
+            }
+          }
+        }
+        
+        const updatedProducts = [finalProduct, ...products];
+        setProducts(updatedProducts);
+        localStorage.setItem("vitrine_products", JSON.stringify(updatedProducts));
+        
+        setShowAddForm(false);
+        setNewProduct({
+          name: "",
+          description: "",
+          price: "",
+          imageUrl: "",
+          shopeeUrl: "",
+          tiktokUrl: "",
+          isFeatured: false,
+          primaryLink: "shopee",
+        });
+      } catch (err: any) {
+        setError(err.message || "Erro ao salvar o produto.");
+      }
+      return;
+    }
 
     try {
       const res = await fetch("/api/products", {
@@ -132,6 +230,32 @@ export default function Admin() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir?")) return;
+
+    if (isStaticMode) {
+      try {
+        const meta = import.meta as any;
+        const hasSupabase = !!(meta.env?.VITE_SUPABASE_URL && meta.env?.VITE_SUPABASE_ANON_KEY);
+        
+        if (hasSupabase) {
+          const { supabase } = await import("../lib/supabase");
+          if (supabase) {
+            const { error: sbError } = await supabase
+              .from("products")
+              .delete()
+              .eq("id", id);
+            if (sbError) throw sbError;
+          }
+        }
+        
+        const filtered = products.filter((p) => p.id !== id);
+        setProducts(filtered);
+        localStorage.setItem("vitrine_products", JSON.stringify(filtered));
+      } catch (err: any) {
+        alert(err.message || "Erro ao excluir o produto.");
+      }
+      return;
+    }
+
     try {
       const res = await fetch(`/api/products/${id}`, {
         method: "DELETE",
